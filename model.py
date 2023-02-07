@@ -8,10 +8,11 @@ from torch import optim
 import copy
 import numpy as np
 from loguru import logger
+from clearml import Logger
 
 
 class MS_TCN2(nn.Module):
-MS_TCB    def __init__(self, num_layers_PG, num_layers_R, num_R, num_f_maps, dim, num_classes):
+    def __init__(self, num_layers_PG, num_layers_R, num_R, num_f_maps, dim, num_classes):
         super(MS_TCN2, self).__init__()
         self.PG = Prediction_Generation(num_layers_PG, num_f_maps, dim, num_classes)
         self.Rs = nn.ModuleList([copy.deepcopy(Refinement(num_layers_R, num_f_maps, num_classes, num_classes)) for s in range(num_R)])
@@ -80,20 +81,22 @@ class Refinement(nn.Module):
             out = layer(out)
         out = self.conv_out(out)
         return out
-    
-class MS_TCN(nn.Module):
-    def __init__(self, num_stages, num_layers, num_f_maps, dim, num_classes):
-        super(MS_TCN, self).__init__()
-        self.stage1 = SS_TCN(num_layers, num_f_maps, dim, num_classes)
-        self.stages = nn.ModuleList([copy.deepcopy(SS_TCN(num_layers, num_f_maps, num_classes, num_classes)) for s in range(num_stages-1)])
 
-    def forward(self, x, mask):
-        out = self.stage1(x, mask)
-        outputs = out.unsqueeze(0)
-        for s in self.stages:
-            out = s(F.softmax(out, dim=1) * mask[:, 0:1, :], mask)
-            outputs = torch.cat((outputs, out.unsqueeze(0)), dim=0)
-        return outputs
+#TODO: not used maybe delete?
+
+# class MS_TCN(nn.Module):
+#     def __init__(self, num_stages, num_layers, num_f_maps, dim, num_classes):
+#         super(MS_TCN, self).__init__()
+#         self.stage1 = SS_TCN(num_layers, num_f_maps, dim, num_classes)
+#         self.stages = nn.ModuleList([copy.deepcopy(SS_TCN(num_layers, num_f_maps, num_classes, num_classes)) for s in range(num_stages-1)])
+#
+#     def forward(self, x, mask):
+#         out = self.stage1(x, mask)
+#         outputs = out.unsqueeze(0)
+#         for s in self.stages:
+#             out = s(F.softmax(out, dim=1) * mask[:, 0:1, :], mask)
+#             outputs = torch.cat((outputs, out.unsqueeze(0)), dim=0)
+#         return outputs
 
 
 class SS_TCN(nn.Module):
@@ -165,8 +168,15 @@ class Trainer:
             batch_gen.reset()
             torch.save(self.model.state_dict(), save_dir + "/epoch-" + str(epoch + 1) + ".model")
             torch.save(optimizer.state_dict(), save_dir + "/epoch-" + str(epoch + 1) + ".opt")
-            logger.info("[epoch %d]: epoch loss = %f,   acc = %f" % (epoch + 1, epoch_loss / len(batch_gen.list_of_examples),
-                                                               float(correct)/total))
+            logger.info("[epoch %d]: epoch loss = %f,   acc = %f" %
+                        (epoch + 1, epoch_loss / len(batch_gen.list_of_examples), float(correct)/total))
+
+            train_loss = epoch_loss / len(batch_gen.list_of_examples)
+            train_acc = float(correct) / total
+            Logger.current_logger().report_scalar(title="train_loss", series="loss", iteration=(epoch + 1),
+                                                  value=train_loss)
+            Logger.current_logger().report_scalar(title="train_acc", series="accuracy", iteration=(epoch + 1),
+                                                  value=train_acc)
 
     def predict(self, model_dir, results_dir, features_path, vid_list_file, epoch, actions_dict, device, sample_rate):
         self.model.eval()
