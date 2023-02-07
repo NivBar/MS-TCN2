@@ -115,7 +115,7 @@ def main():
     _, vid_list_file_tst_folds, _ = utils.get_folds_paths()
     for file_list in vid_list_file_tst_folds:
         list_of_videos.extend(read_file(file_list).split('\n')[:-1])
-    x=1
+
     overlap = [.1, .25, .5]
     tp, fp, fn = np.zeros(3), np.zeros(3), np.zeros(3)
 

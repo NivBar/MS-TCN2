@@ -9,6 +9,8 @@ import copy
 import numpy as np
 from loguru import logger
 from clearml import Logger
+from tqdm import tqdm
+import pandas as pd
 
 
 class MS_TCN2(nn.Module):
@@ -144,7 +146,9 @@ class Trainer:
         logger.add('logs/' + dataset + "_" + split + "_{time}.log")
         logger.add(sys.stdout, colorize=True, format="{message}")
 
-    def train(self, save_dir, batch_gen_train, batch_gen_val, num_epochs, batch_size, learning_rate, device):
+    def train(self, save_dir, batch_gen_train, batch_gen_val, train_df, num_epochs, batch_size, learning_rate, split,
+              device):
+        data = []
         optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
         for epoch in range(num_epochs):
             self.model.train()
@@ -152,7 +156,8 @@ class Trainer:
             epoch_loss = 0
             correct = 0
             total = 0
-            while batch_gen_train.has_next():
+            print(f"Train epoch number: {epoch + 1}")
+            for _ in tqdm(range(len(batch_gen_train.list_of_examples))):
                 batch_input, batch_target, mask = batch_gen_train.next_batch(batch_size)
                 batch_input, batch_target, mask = batch_input.to(device), batch_target.to(device), mask.to(device)
                 optimizer.zero_grad()
@@ -188,14 +193,19 @@ class Trainer:
             Logger.current_logger().report_scalar(title="train_acc", series="accuracy", iteration=(epoch + 1),
                                                   value=train_acc)
 
+            data.append(
+                {"Split": split, "Type": "Train", "Epoch": epoch + 1, "Loss": train_loss, "Accuracy": train_acc})
+
             ##### Validation Section #####
+
             with torch.no_grad():
+                print(f"Validation epoch number: {epoch + 1}")
                 self.model.eval()
                 self.model.to(device)
                 epoch_loss = 0
                 correct = 0
                 total = 0
-                while batch_gen_val.has_next():
+                for _ in tqdm(range(len(batch_gen_val.list_of_examples))):
                     batch_input, batch_target, mask = batch_gen_val.next_batch(batch_size)
                     batch_input, batch_target, mask = batch_input.to(device), batch_target.to(device), mask.to(device)
                     # optimizer.zero_grad()
@@ -233,7 +243,13 @@ class Trainer:
                 Logger.current_logger().report_scalar(title="valid_acc", series="accuracy", iteration=(epoch + 1),
                                                       value=valid_acc)
 
+                data.append({"Split": split, "Type": "Validation", "Epoch": epoch + 1, "Loss": valid_loss,
+                             "Accuracy": valid_acc})
+        df = pd.DataFrame(data)
+        return pd.concat([train_df, df])
+
     def predict(self, model_dir, results_dir, features_path, vid_list_file, epoch, actions_dict, device, sample_rate):
+        data = []
         self.model.eval()
         with torch.no_grad():
             self.model.to(device)

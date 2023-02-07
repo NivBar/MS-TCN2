@@ -10,6 +10,7 @@ import paths
 import utils
 # from os import listdir
 # from os.path import isfile, join
+import pandas as pd
 from clearml import Task
 
 # clearml block
@@ -96,6 +97,7 @@ num_classes = len(actions_dict)
 # trainer = Trainer(num_layers_PG, num_layers_R, num_R, num_f_maps, features_dim, num_classes, args.dataset, args.split)
 
 if args.action == "train":
+    train_df = pd.DataFrame()
     for i in range(utils.available_folds):
         trainer = Trainer(num_layers_PG, num_layers_R, num_R, num_f_maps, features_dim, num_classes, f"fold{i}",
                           f"fold{i}")
@@ -109,14 +111,16 @@ if args.action == "train":
 
         batch_gen_val = BatchGenerator(num_classes, actions_dict, gt_path, valid_feature_paths, sample_rate)
         batch_gen_val.read_data(val_files)
-        trainer.train(model_dir, batch_gen_train, batch_gen_val, num_epochs=num_epochs, batch_size=bz, learning_rate=lr,
-                      device=device)
+        train_df = trainer.train(model_dir, batch_gen_train, batch_gen_val, train_df, num_epochs=num_epochs,
+                                 batch_size=bz, learning_rate=lr, split=i, device=device)
 
         # predict on test fold
         test_files = [tf for tf in vid_list_file_tst_folds if vid_list_file_folds.index(tf) == i]
         test_feature_paths = [tf for tf in features_path_folds if features_path_folds.index(tf) == i]
         trainer.predict(model_dir, results_dir, *test_feature_paths, *test_files, num_epochs, actions_dict, device,
                         sample_rate)
+
+    train_df.to_csv("training_results.csv", index=False)
 
 # if args.action == "predict": trainer.predict(model_dir, results_dir, *test_feature_paths, *test_files, num_epochs,
 # actions_dict, device, sample_rate)
