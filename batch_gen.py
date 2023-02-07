@@ -7,13 +7,13 @@ import utils
 
 
 class BatchGenerator(object):
-    def __init__(self, num_classes, actions_dict, gt_path, features_path, sample_rate):
+    def __init__(self, num_classes, actions_dict, gt_path, features_paths, sample_rate):
         self.list_of_examples = list()
         self.index = 0
         self.num_classes = num_classes
         self.actions_dict = actions_dict
         self.gt_path = gt_path
-        self.features_path = features_path
+        self.features_paths = features_paths
         self.sample_rate = sample_rate
 
     def reset(self):
@@ -26,10 +26,11 @@ class BatchGenerator(object):
         return False
 
     def read_data(self, vid_list_file):
-        file_ptr = open(vid_list_file, 'r')
-        self.list_of_examples = file_ptr.read().split('\n')[:-1]
-        file_ptr.close()
-        random.shuffle(self.list_of_examples)
+        for path in vid_list_file:
+            file_ptr = open(path, 'r')
+            self.list_of_examples.extend(file_ptr.read().split('\n')[:-1])
+            file_ptr.close()
+            random.shuffle(self.list_of_examples)
 
     def next_batch(self, batch_size):
         batch = self.list_of_examples[self.index:self.index + batch_size]
@@ -38,17 +39,17 @@ class BatchGenerator(object):
         batch_input = []
         batch_target = []
         for vid in batch:
-            features = np.load(self.features_path + vid.split('.')[0] + '.npy')
-            # TODO: delete original code
-            # file_ptr = open(self.gt_path + vid, 'r')
-            # content = file_ptr.read().split('\n')[:-1]
-            # TODO: check if works
-            content = utils.gt_converter(self.gt_path + vid.replace("csv", "txt"))
-            classes = np.zeros(min(np.shape(features)[1], len(content)))
-            for i in range(len(classes)):
-                classes[i] = content[i]
-            batch_input.append(features[:, ::self.sample_rate])
-            batch_target.append(classes[::self.sample_rate])
+            for feat_path in self.features_paths:
+                features = np.load(feat_path + vid.split('.')[0] + '.npy')
+                # TODO: delete original code
+                # file_ptr = open(self.gt_path + vid, 'r')
+                # content = file_ptr.read().split('\n')[:-1]
+                content = utils.gt_converter(self.gt_path + vid.replace("csv", "txt"))
+                classes = np.zeros(min(np.shape(features)[1], len(content)))
+                for i in range(len(classes)):
+                    classes[i] = content[i]
+                batch_input.append(features[:, ::self.sample_rate])
+                batch_target.append(classes[::self.sample_rate])
 
         length_of_sequences = list(map(len, batch_target))
         batch_input_tensor = torch.zeros(len(batch_input), np.shape(batch_input[0])[0], max(length_of_sequences),

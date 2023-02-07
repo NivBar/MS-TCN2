@@ -2,10 +2,14 @@
 # adapted from: https://github.com/colincsl/TemporalConvolutionalNetworks/blob/master/code/metrics.py
 
 import numpy as np
-import argparse
+# import argparse
 import utils
 import paths
-from clearml import Logger
+from clearml import Logger, Task
+
+task = Task.init(project_name='CVOR_PROJ', task_name='TEST-EVAL')
+# TODO: check if can be changed (Ilanit)
+task.set_user_properties({"name": "backbone", "description": "network type", "value": "mstcn++"})
 
 
 def read_file(path):
@@ -39,7 +43,7 @@ def get_labels_start_end_time(frame_wise_labels, bg_class=["background"]):
 def levenstein(p, y, norm=False):
     m_row = len(p)
     n_col = len(y)
-    D = np.zeros([m_row + 1, n_col + 1], np.float)
+    D = np.zeros([m_row + 1, n_col + 1], float)
     for i in range(m_row + 1):
         D[i, 0] = i
     for i in range(n_col + 1):
@@ -95,19 +99,23 @@ def f_score(recognized, ground_truth, overlap, bg_class=["background"]):
 
 def main():
     actions_dict = utils.create_actions_dict()
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument('--dataset', default="gtea")
-    parser.add_argument('--split', default='1')
-
-    args = parser.parse_args()
+    # parser = argparse.ArgumentParser()
+    #
+    # parser.add_argument('--dataset', default="gtea")
+    # parser.add_argument('--split', default='1')
+    #
+    # args = parser.parse_args()
 
     ground_truth_path = paths.gt_path
     recog_path = paths.results_dir
     file_list = paths.vid_list_file_tst
 
-    list_of_videos = read_file(file_list).split('\n')[:-1]
-
+    # list_of_videos = read_file(file_list).split('\n')[:-1]
+    list_of_videos = []
+    _, vid_list_file_tst_folds, _ = utils.get_folds_paths()
+    for file_list in vid_list_file_tst_folds:
+        list_of_videos.extend(read_file(file_list).split('\n')[:-1])
+    x=1
     overlap = [.1, .25, .5]
     tp, fp, fn = np.zeros(3), np.zeros(3), np.zeros(3)
 
@@ -135,10 +143,13 @@ def main():
             fp[s] += fp1
             fn[s] += fn1
 
-    print("Acc: %.4f" % (100 * float(correct) / total))
-    print('Edit: %.4f' % ((1.0 * edit) / len(list_of_videos)))
+    # print("Acc: %.4f" % (100 * float(correct) / total))
+    # print('Edit: %.4f' % ((1.0 * edit) / len(list_of_videos)))
     acc = (100 * float(correct) / total)
     edit = ((1.0 * edit) / len(list_of_videos))
+
+    # clearml block
+    Logger.current_logger().report_text(f"Test Results:\nTest Acc: {acc}\nTest Edit: {edit}")
 
     for s in range(len(overlap)):
         precision = tp[s] / float(tp[s] + fp[s])
@@ -147,7 +158,10 @@ def main():
         f1 = 2.0 * (precision * recall) / (precision + recall)
 
         f1 = np.nan_to_num(f1) * 100
-        print('F1@%0.2f: %.4f' % (overlap[s], f1))
+        # print('F1@%0.2f: %.4f' % (overlap[s], f1))
+
+        # clearml block
+        Logger.current_logger().report_text(f"F1@{overlap[s]}: {f1}")
 
 
 if __name__ == '__main__':

@@ -15,7 +15,8 @@ class MS_TCN2(nn.Module):
     def __init__(self, num_layers_PG, num_layers_R, num_R, num_f_maps, dim, num_classes):
         super(MS_TCN2, self).__init__()
         self.PG = Prediction_Generation(num_layers_PG, num_f_maps, dim, num_classes)
-        self.Rs = nn.ModuleList([copy.deepcopy(Refinement(num_layers_R, num_f_maps, num_classes, num_classes)) for s in range(num_R)])
+        self.Rs = nn.ModuleList(
+            [copy.deepcopy(Refinement(num_layers_R, num_f_maps, num_classes, num_classes)) for s in range(num_R)])
 
     def forward(self, x):
         out = self.PG(x)
@@ -26,6 +27,7 @@ class MS_TCN2(nn.Module):
 
         return outputs
 
+
 class Prediction_Generation(nn.Module):
     def __init__(self, num_layers, num_f_maps, dim, num_classes):
         super(Prediction_Generation, self).__init__()
@@ -35,21 +37,20 @@ class Prediction_Generation(nn.Module):
         self.conv_1x1_in = nn.Conv1d(dim, num_f_maps, 1)
 
         self.conv_dilated_1 = nn.ModuleList((
-            nn.Conv1d(num_f_maps, num_f_maps, 3, padding=2**(num_layers-1-i), dilation=2**(num_layers-1-i))
+            nn.Conv1d(num_f_maps, num_f_maps, 3, padding=2 ** (num_layers - 1 - i), dilation=2 ** (num_layers - 1 - i))
             for i in range(num_layers)
         ))
 
         self.conv_dilated_2 = nn.ModuleList((
-            nn.Conv1d(num_f_maps, num_f_maps, 3, padding=2**i, dilation=2**i)
+            nn.Conv1d(num_f_maps, num_f_maps, 3, padding=2 ** i, dilation=2 ** i)
             for i in range(num_layers)
         ))
 
         self.conv_fusion = nn.ModuleList((
-             nn.Conv1d(2*num_f_maps, num_f_maps, 1)
-             for i in range(num_layers)
+            nn.Conv1d(2 * num_f_maps, num_f_maps, 1)
+            for i in range(num_layers)
 
-            ))
-
+        ))
 
         self.dropout = nn.Dropout()
         self.conv_out = nn.Conv1d(num_f_maps, num_classes, 1)
@@ -68,11 +69,13 @@ class Prediction_Generation(nn.Module):
 
         return out
 
+
 class Refinement(nn.Module):
     def __init__(self, num_layers, num_f_maps, dim, num_classes):
         super(Refinement, self).__init__()
         self.conv_1x1 = nn.Conv1d(dim, num_f_maps, 1)
-        self.layers = nn.ModuleList([copy.deepcopy(DilatedResidualLayer(2**i, num_f_maps, num_f_maps)) for i in range(num_layers)])
+        self.layers = nn.ModuleList(
+            [copy.deepcopy(DilatedResidualLayer(2 ** i, num_f_maps, num_f_maps)) for i in range(num_layers)])
         self.conv_out = nn.Conv1d(num_f_maps, num_classes, 1)
 
     def forward(self, x):
@@ -82,13 +85,15 @@ class Refinement(nn.Module):
         out = self.conv_out(out)
         return out
 
-#TODO: not used maybe delete?
+
+# TODO: not used maybe delete?
 
 # class MS_TCN(nn.Module):
 #     def __init__(self, num_stages, num_layers, num_f_maps, dim, num_classes):
 #         super(MS_TCN, self).__init__()
 #         self.stage1 = SS_TCN(num_layers, num_f_maps, dim, num_classes)
-#         self.stages = nn.ModuleList([copy.deepcopy(SS_TCN(num_layers, num_f_maps, num_classes, num_classes)) for s in range(num_stages-1)])
+#         self.stages = nn.ModuleList([copy.deepcopy(SS_TCN(num_layers, num_f_maps, num_classes, num_classes)) for s in
+#         range(num_stages-1)])
 #
 #     def forward(self, x, mask):
 #         out = self.stage1(x, mask)
@@ -103,7 +108,8 @@ class SS_TCN(nn.Module):
     def __init__(self, num_layers, num_f_maps, dim, num_classes):
         super(SS_TCN, self).__init__()
         self.conv_1x1 = nn.Conv1d(dim, num_f_maps, 1)
-        self.layers = nn.ModuleList([copy.deepcopy(DilatedResidualLayer(2 ** i, num_f_maps, num_f_maps)) for i in range(num_layers)])
+        self.layers = nn.ModuleList(
+            [copy.deepcopy(DilatedResidualLayer(2 ** i, num_f_maps, num_f_maps)) for i in range(num_layers)])
         self.conv_out = nn.Conv1d(num_f_maps, num_classes, 1)
 
     def forward(self, x, mask):
@@ -138,16 +144,16 @@ class Trainer:
         logger.add('logs/' + dataset + "_" + split + "_{time}.log")
         logger.add(sys.stdout, colorize=True, format="{message}")
 
-    def train(self, save_dir, batch_gen, num_epochs, batch_size, learning_rate, device):
-        self.model.train()
-        self.model.to(device)
+    def train(self, save_dir, batch_gen_train, batch_gen_val, num_epochs, batch_size, learning_rate, device):
         optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
         for epoch in range(num_epochs):
+            self.model.train()
+            self.model.to(device)
             epoch_loss = 0
             correct = 0
             total = 0
-            while batch_gen.has_next():
-                batch_input, batch_target, mask = batch_gen.next_batch(batch_size)
+            while batch_gen_train.has_next():
+                batch_input, batch_target, mask = batch_gen_train.next_batch(batch_size)
                 batch_input, batch_target, mask = batch_input.to(device), batch_target.to(device), mask.to(device)
                 optimizer.zero_grad()
                 predictions = self.model(batch_input)
@@ -155,28 +161,77 @@ class Trainer:
                 loss = 0
                 for p in predictions:
                     loss += self.ce(p.transpose(2, 1).contiguous().view(-1, self.num_classes), batch_target.view(-1))
-                    loss += 0.15*torch.mean(torch.clamp(self.mse(F.log_softmax(p[:, :, 1:], dim=1), F.log_softmax(p.detach()[:, :, :-1], dim=1)), min=0, max=16)*mask[:, :, 1:])
+                    loss += 0.15 * torch.mean(torch.clamp(
+                        self.mse(F.log_softmax(p[:, :, 1:], dim=1), F.log_softmax(p.detach()[:, :, :-1], dim=1)), min=0,
+                        max=16) * mask[:, :, 1:])
 
                 epoch_loss += loss.item()
                 loss.backward()
                 optimizer.step()
 
                 _, predicted = torch.max(predictions[-1].data, 1)
-                correct += ((predicted == batch_target).float()*mask[:, 0, :].squeeze(1)).sum().item()
+                correct += ((predicted == batch_target).float() * mask[:, 0, :].squeeze(1)).sum().item()
                 total += torch.sum(mask[:, 0, :]).item()
 
-            batch_gen.reset()
+            batch_gen_train.reset()
             torch.save(self.model.state_dict(), save_dir + "/epoch-" + str(epoch + 1) + ".model")
             torch.save(optimizer.state_dict(), save_dir + "/epoch-" + str(epoch + 1) + ".opt")
-            logger.info("[epoch %d]: epoch loss = %f,   acc = %f" %
-                        (epoch + 1, epoch_loss / len(batch_gen.list_of_examples), float(correct)/total))
+            logger.info("[epoch %d]: epoch train loss = %f,   train acc = %f" %
+                        (epoch + 1, epoch_loss / len(batch_gen_train.list_of_examples), float(correct) / total))
 
-            train_loss = epoch_loss / len(batch_gen.list_of_examples)
+            train_loss = epoch_loss / len(batch_gen_train.list_of_examples)
             train_acc = float(correct) / total
+
+            # clearml block
             Logger.current_logger().report_scalar(title="train_loss", series="loss", iteration=(epoch + 1),
                                                   value=train_loss)
             Logger.current_logger().report_scalar(title="train_acc", series="accuracy", iteration=(epoch + 1),
                                                   value=train_acc)
+
+            ##### Validation Section #####
+            with torch.no_grad():
+                self.model.eval()
+                self.model.to(device)
+                epoch_loss = 0
+                correct = 0
+                total = 0
+                while batch_gen_val.has_next():
+                    batch_input, batch_target, mask = batch_gen_val.next_batch(batch_size)
+                    batch_input, batch_target, mask = batch_input.to(device), batch_target.to(device), mask.to(device)
+                    # optimizer.zero_grad()
+                    predictions = self.model(batch_input)
+
+                    loss = 0
+                    for p in predictions:
+                        loss += self.ce(p.transpose(2, 1).contiguous().view(-1, self.num_classes),
+                                        batch_target.view(-1))
+                        loss += 0.15 * torch.mean(torch.clamp(
+                            self.mse(F.log_softmax(p[:, :, 1:], dim=1), F.log_softmax(p.detach()[:, :, :-1], dim=1)),
+                            min=0,
+                            max=16) * mask[:, :, 1:])
+
+                    epoch_loss += loss.item()
+                    # loss.backward()
+                    # optimizer.step()
+
+                    _, predicted = torch.max(predictions[-1].data, 1)
+                    correct += ((predicted == batch_target).float() * mask[:, 0, :].squeeze(1)).sum().item()
+                    total += torch.sum(mask[:, 0, :]).item()
+
+                batch_gen_val.reset()
+                # torch.save(self.model.state_dict(), save_dir + "/epoch-" + str(epoch + 1) + ".model")
+                # torch.save(optimizer.state_dict(), save_dir + "/epoch-" + str(epoch + 1) + ".opt")
+                logger.info("[epoch %d]: epoch valid loss = %f,   valid acc = %f" %
+                            (epoch + 1, epoch_loss / len(batch_gen_train.list_of_examples), float(correct) / total))
+
+                valid_loss = epoch_loss / len(batch_gen_val.list_of_examples)
+                valid_acc = float(correct) / total
+
+                # clearml block
+                Logger.current_logger().report_scalar(title="valid_loss", series="loss", iteration=(epoch + 1),
+                                                      value=valid_loss)
+                Logger.current_logger().report_scalar(title="valid_acc", series="accuracy", iteration=(epoch + 1),
+                                                      value=valid_acc)
 
     def predict(self, model_dir, results_dir, features_path, vid_list_file, epoch, actions_dict, device, sample_rate):
         self.model.eval()
@@ -187,7 +242,7 @@ class Trainer:
             list_of_vids = file_ptr.read().split('\n')[:-1]
             file_ptr.close()
             for vid in list_of_vids:
-                #print vid
+                # print vid
                 features = np.load(features_path + vid.split('.')[0] + '.npy')
                 features = features[:, ::sample_rate]
                 input_x = torch.tensor(features, dtype=torch.float)
@@ -198,10 +253,11 @@ class Trainer:
                 predicted = predicted.squeeze()
                 recognition = []
                 for i in range(len(predicted)):
-                    recognition = np.concatenate((recognition, [list(actions_dict.keys())[list(actions_dict.values()).index(predicted[i].item())]]*sample_rate))
+                    recognition = np.concatenate((recognition, [list(actions_dict.keys())[
+                                                                    list(actions_dict.values()).index(
+                                                                        predicted[i].item())]] * sample_rate))
                 f_name = vid.split('/')[-1].split('.')[0]
                 f_ptr = open(results_dir + "/" + f_name, "w")
                 f_ptr.write("### Frame level recognition: ###\n")
                 f_ptr.write(' '.join(recognition))
                 f_ptr.close()
-
