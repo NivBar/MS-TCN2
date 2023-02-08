@@ -37,7 +37,7 @@ parser.add_argument('--lr', default='0.0005', type=float)
 parser.add_argument('--num_f_maps', default='64', type=int)
 
 # Need input
-parser.add_argument('--num_epochs', default=3, type=int)
+parser.add_argument('--num_epochs', default=utils.num_epochs, type=int)
 parser.add_argument('--num_layers_PG', default=11, type=int)
 parser.add_argument('--num_layers_R', default=10, type=int)
 parser.add_argument('--num_R', default=3, type=int)
@@ -122,8 +122,10 @@ if args.action == "train":
         best_epoch = \
             train_df.iloc[train_df[(train_df.Split == i) & (train_df.Type == "Validation")]["Accuracy"].idxmax()][
                 "Epoch"]
+
         trainer.predict(model_dir, results_dir, *test_feature_paths, *test_files, best_epoch, actions_dict, device,
                         sample_rate, i)
+        print('\033[1m' + f"\n\n### best model for split {i} was chosen from epoch number {best_epoch}\{num_epochs} ###\n\n" + '\033[0m')
 
     train_df.to_csv("final_training_results.csv", index=False)
 

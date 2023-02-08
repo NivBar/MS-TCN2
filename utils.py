@@ -4,9 +4,16 @@ This file will include utility functions we add in order to fit our surgical dat
 import pandas as pd
 import numpy as np
 import paths
+import torch
 
-available_folds = 2
-start_idx = 0
+if torch.cuda.is_available(): # on machine with GPU
+    available_folds = 5
+    num_epochs = 5
+else: # local debugging
+    available_folds = 2
+    num_epochs = 3
+
+start_idx = 0  # in case we want to skip training on some indexes
 
 def get_folds_paths():
     vid_list_file_folds = [paths.vid_list_file + f"valid {i}.txt" for i in range(available_folds)]
