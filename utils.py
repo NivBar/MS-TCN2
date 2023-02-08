@@ -6,6 +6,7 @@ import numpy as np
 import paths
 
 available_folds = 2
+start_idx = 0
 
 def get_folds_paths():
     vid_list_file_folds = [paths.vid_list_file + f"valid {i}.txt" for i in range(available_folds)]

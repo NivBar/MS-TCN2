@@ -13,10 +13,10 @@ import utils
 import pandas as pd
 from clearml import Task
 
-# clearml block
-task = Task.init(project_name='CVOR_PROJ', task_name='TEST-TRAIN')
-# TODO: check if can be changed (Ilanit)
-task.set_user_properties({"name": "backbone", "description": "network type", "value": "mstcn++"})
+# # clearml block
+# task = Task.init(project_name='CVOR_PROJ', task_name='TEST-TRAIN')
+# # TODO: check if can be changed (Ilanit)
+# task.set_user_properties({"name": "backbone", "description": "network type", "value": "mstcn++"})
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 seed = 1538574472
@@ -98,7 +98,7 @@ num_classes = len(actions_dict)
 
 if args.action == "train":
     train_df = pd.DataFrame()
-    for i in range(utils.available_folds):
+    for i in range(utils.start_idx, utils.available_folds):
         trainer = Trainer(num_layers_PG, num_layers_R, num_R, num_f_maps, features_dim, num_classes, f"fold{i}",
                           f"fold{i}")
         train_files = [tf for tf in vid_list_file_folds if vid_list_file_folds.index(tf) != i]
@@ -113,14 +113,19 @@ if args.action == "train":
         batch_gen_val.read_data(val_files)
         train_df = trainer.train(model_dir, batch_gen_train, batch_gen_val, train_df, num_epochs=num_epochs,
                                  batch_size=bz, learning_rate=lr, split=i, device=device)
+        train_df.to_csv("temp_training_results.csv", index=False)
 
         # predict on test fold
         test_files = [tf for tf in vid_list_file_tst_folds if vid_list_file_folds.index(tf) == i]
         test_feature_paths = [tf for tf in features_path_folds if features_path_folds.index(tf) == i]
-        trainer.predict(model_dir, results_dir, *test_feature_paths, *test_files, num_epochs, actions_dict, device,
-                        sample_rate)
 
-    train_df.to_csv("training_results.csv", index=False)
+        best_epoch = \
+            train_df.iloc[train_df[(train_df.Split == i) & (train_df.Type == "Validation")]["Accuracy"].idxmax()][
+                "Epoch"]
+        trainer.predict(model_dir, results_dir, *test_feature_paths, *test_files, best_epoch, actions_dict, device,
+                        sample_rate, i)
+
+    train_df.to_csv("final_training_results.csv", index=False)
 
 # if args.action == "predict": trainer.predict(model_dir, results_dir, *test_feature_paths, *test_files, num_epochs,
 # actions_dict, device, sample_rate)
