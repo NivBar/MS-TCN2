@@ -26,7 +26,7 @@ torch.cuda.manual_seed_all(seed)
 torch.backends.cudnn.deterministic = True
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--action', default='train')
+parser.add_argument('--action', default='predict')
 parser.add_argument('--dataset', default="gtea")
 parser.add_argument('--split', default='1')
 
@@ -125,9 +125,18 @@ if args.action == "train":
 
         trainer.predict(model_dir, results_dir, *test_feature_paths, *test_files, best_epoch, actions_dict, device,
                         sample_rate, i)
-        print('\033[1m' + f"\n\n### best model for split {i} was chosen from epoch number {best_epoch}\{num_epochs} ###\n\n" + '\033[0m')
+        print(
+            '\033[1m' + f"\n\n### best model for split {i} was chosen from epoch number {best_epoch}\{num_epochs} ###\n\n" + '\033[0m')
 
     train_df.to_csv("final_training_results.csv", index=False)
 
-# if args.action == "predict": trainer.predict(model_dir, results_dir, *test_feature_paths, *test_files, num_epochs,
-# actions_dict, device, sample_rate)
+if args.action == "predict":
+    model_dict = utils.model_dict
+    for i in range(len(model_dict)):
+        test_files = vid_list_file_tst_folds[i]
+        test_feature_paths = features_path_folds[i]
+
+        trainer = Trainer(num_layers_PG, num_layers_R, num_R, num_f_maps, features_dim, num_classes, f"fold{i}",
+                          f"fold{i}")
+        trainer.predict(model_dir, results_dir, test_feature_paths, test_files, model_dict[i], actions_dict, device,
+                        sample_rate, split=i)

@@ -7,9 +7,9 @@ import utils
 import paths
 from clearml import Logger, Task
 
-task = Task.init(project_name='CVOR_PROJ', task_name='TEST-EVAL')
-# TODO: check if can be changed (Ilanit)
-task.set_user_properties({"name": "backbone", "description": "network type", "value": "mstcn++"})
+# task = Task.init(project_name='CVOR_PROJ', task_name='TEST-EVAL')
+# # TODO: check if can be changed (Ilanit)
+# task.set_user_properties({"name": "backbone", "description": "network type", "value": "mstcn++"})
 
 
 def read_file(path):
@@ -148,8 +148,8 @@ def main():
     acc = (100 * float(correct) / total)
     edit = ((1.0 * edit) / len(list_of_videos))
 
-    # clearml block
-    Logger.current_logger().report_text(f"Test Results:\nTest Acc: {acc}\nTest Edit: {edit}")
+    # # clearml block
+    # Logger.current_logger().report_text(f"Test Results:\nTest Acc: {acc}\nTest Edit: {edit}")
 
     for s in range(len(overlap)):
         precision = tp[s] / float(tp[s] + fp[s])
@@ -160,8 +160,8 @@ def main():
         f1 = np.nan_to_num(f1) * 100
         # print('F1@%0.2f: %.4f' % (overlap[s], f1))
 
-        # clearml block
-        Logger.current_logger().report_text(f"F1@{overlap[s]}: {f1}")
+        # # clearml block
+        # Logger.current_logger().report_text(f"F1@{overlap[s]}: {f1}")
 
 
 if __name__ == '__main__':

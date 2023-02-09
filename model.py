@@ -249,6 +249,7 @@ class Trainer:
         return pd.concat([train_df, df])
 
     def predict(self, model_dir, results_dir, features_path, vid_list_file, epoch, actions_dict, device, sample_rate, split):
+        print(f"##### prediction - model: split-{split}-epoch-{epoch} #####")
         self.model.eval()
         with torch.no_grad():
             self.model.to(device)
@@ -256,7 +257,7 @@ class Trainer:
             file_ptr = open(vid_list_file, 'r')
             list_of_vids = file_ptr.read().split('\n')[:-1]
             file_ptr.close()
-            for vid in list_of_vids:
+            for vid in tqdm(list_of_vids):
                 # print vid
                 features = np.load(features_path + vid.split('.')[0] + '.npy')
                 features = features[:, ::sample_rate]
