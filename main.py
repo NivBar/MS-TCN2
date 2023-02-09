@@ -26,7 +26,7 @@ torch.cuda.manual_seed_all(seed)
 torch.backends.cudnn.deterministic = True
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--action', default='predict')
+parser.add_argument('--action', default='train')
 parser.add_argument('--dataset', default="gtea")
 parser.add_argument('--split', default='1')
 
@@ -98,6 +98,7 @@ num_classes = len(actions_dict)
 
 if args.action == "train":
     train_df = pd.DataFrame()
+    chosen = open("chosen_epochs.txt", "a+")
     for i in range(utils.start_idx, utils.available_folds):
         trainer = Trainer(num_layers_PG, num_layers_R, num_R, num_f_maps, features_dim, num_classes, f"fold{i}",
                           f"fold{i}")
@@ -116,17 +117,15 @@ if args.action == "train":
         train_df.to_csv("temp_training_results.csv", index=False)
 
         # predict on test fold
-        test_files = [tf for tf in vid_list_file_tst_folds if vid_list_file_folds.index(tf) == i]
-        test_feature_paths = [tf for tf in features_path_folds if features_path_folds.index(tf) == i]
+        # test_files = [tf for tf in vid_list_file_tst_folds if vid_list_file_folds.index(tf) = i]
+        # test_feature_paths = [tf for tf in features_path_folds if features_path_folds.index(tf) == i]=
 
         best_epoch = \
             train_df.iloc[train_df[(train_df.Split == i) & (train_df.Type == "Validation")]["Accuracy"].idxmax()][
                 "Epoch"]
-
-        trainer.predict(model_dir, results_dir, *test_feature_paths, *test_files, best_epoch, actions_dict, device,
-                        sample_rate, i)
-        print(
-            '\033[1m' + f"\n\n### best model for split {i} was chosen from epoch number {best_epoch}\{num_epochs} ###\n\n" + '\033[0m')
+        chosen.write(f"{i}: {best_epoch}\n")
+        # trainer.predict(model_dir, results_dir, *test_feature_paths, *test_files, best_epoch, actions_dict, device, sample_rate, i)
+        print('\033[1m' + f"\n\n### best model for split {i} was chosen from epoch number {best_epoch}\{num_epochs} ###\n\n" + '\033[0m')
 
     train_df.to_csv("final_training_results.csv", index=False)
 
