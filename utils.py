@@ -16,8 +16,11 @@ else: # local debugging
     model_dict = {0: 3, 1: 3}
 
 start_idx = 0  # in case we want to skip training on some indexes
+kin_lambda = (36/1280)*2
+len_df = pd.read_csv("length_table.csv").set_index("vid_name")
+kin_features_dim = 36
 
- #
+
 def get_folds_paths():
     vid_list_file_folds = [paths.vid_list_file + f"valid {i}.txt" for i in range(available_folds)]
     vid_list_file_tst_folds = [paths.vid_list_file_tst + f"test {i}.txt" for i in range(available_folds)]
