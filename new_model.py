@@ -166,15 +166,22 @@ class Trainer:
         logger.add(sys.stdout, colorize=True, format="{message}")
 
     def load_previous_model(self, type_, optimizer=None):
+        # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        map_location = "cuda:0" if torch.cuda.is_available() else 'cpu'
         model_list = [m for m in listdir(paths.model_dir + "-new") if (type_ in m) & (self.split in m)]
         max_ind = max([int(model.split(".")[0].split("-")[-1]) for model in model_list])
         self.latest_epoch = max_ind
         if type_ == "model":
             self.model.load_state_dict(
-                torch.load(paths.model_dir + f"-new/split-{self.split}-epoch-" + str(max_ind) + f".{type_}"))
+                torch.load(paths.model_dir + f"-new/split-{self.split}-epoch-" + str(max_ind) + f".{type_}", map_location=map_location))
         elif type_ == "opt":
             optimizer.load_state_dict(
-                torch.load(paths.model_dir + f"-new/split-{self.split}-epoch-" + str(max_ind) + f".{type_}"))
+                torch.load(paths.model_dir + f"-new/split-{self.split}-epoch-" + str(max_ind) + f".{type_}", map_location=map_location))
+            if map_location == "cuda:0":
+                for state in optimizer.state.values():
+                    for k, v in state.items():
+                        if torch.is_tensor(v):
+                            state[k] = v.cuda()
 
     def train(self, save_dir, batch_gen_train, batch_gen_val, train_df, num_epochs, batch_size,
               learning_rate, split,

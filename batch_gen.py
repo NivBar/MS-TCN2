@@ -73,7 +73,7 @@ class BatchGenerator(object):
                                          dtype=torch.float)
         if self.kinematics:
             batch_kin_tensor = torch.zeros(len(batch_kin), np.shape(batch_kin[0])[0], max(length_of_sequences),
-                                             dtype=torch.float)
+                                           dtype=torch.float)
 
         batch_target_tensor = torch.ones(len(batch_input), max(length_of_sequences), dtype=torch.long) * (-100)
         mask = torch.zeros(len(batch_input), self.num_classes, max(length_of_sequences), dtype=torch.float)
