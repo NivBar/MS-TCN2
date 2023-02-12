@@ -11,7 +11,7 @@ from loguru import logger
 from clearml import Logger
 from tqdm import tqdm
 import pandas as pd
-
+from os import listdir
 import paths
 import utils
 
@@ -38,7 +38,7 @@ class MS_TCN2(nn.Module):
             out_kin = R(F.softmax(out_kin, dim=1))
             outputs_kin = torch.cat((outputs_kin, out_kin.unsqueeze(0)), dim=0)
 
-        return outputs*(1-utils.kin_lambda) + outputs_kin*utils.kin_lambda
+        return outputs * (1 - utils.kin_lambda) + outputs_kin * utils.kin_lambda
 
 
 class Prediction_Generation(nn.Module):
@@ -148,9 +148,16 @@ class DilatedResidualLayer(nn.Module):
 
 
 class Trainer:
-    def __init__(self, num_layers_PG, num_layers_R, num_R, num_f_maps, features_dim, num_classes, dataset, split):
+    def __init__(self, num_layers_PG, num_layers_R, num_R, num_f_maps, features_dim, num_classes, dataset, split,
+                 pretrained=False):
+        print(
+            f"\n\n##### running new model #####\nsplit-{split}\nplanned epochs per model - {utils.num_epochs}\navailable folds - {utils.available_folds}\n\n")
         self.model = MS_TCN2(num_layers_PG, num_layers_R, num_R, num_f_maps, features_dim, num_classes)
-        # self.kin_model = MS_TCN2(num_layers_PG, num_layers_R, num_R, num_f_maps, 36, num_classes)
+        self.pretrained = pretrained
+        self.split = split
+        self.latest_epoch = 0
+        if self.pretrained:
+            self.load_previous_model("model")
         self.ce = nn.CrossEntropyLoss(ignore_index=-100)
         self.mse = nn.MSELoss(reduction='none')
         self.num_classes = num_classes
@@ -158,53 +165,39 @@ class Trainer:
         logger.add('logs/' + dataset + "_" + split + "_{time}.log")
         logger.add(sys.stdout, colorize=True, format="{message}")
 
+    def load_previous_model(self, type_, optimizer=None):
+        model_list = [m for m in listdir(paths.model_dir + "-new") if (type_ in m) & (self.split in m)]
+        max_ind = max([int(model.split(".")[0].split("-")[-1]) for model in model_list])
+        self.latest_epoch = max_ind
+        if type_ == "model":
+            self.model.load_state_dict(
+                torch.load(paths.model_dir + f"-new/split-{self.split}-epoch-" + str(max_ind) + f".{type_}"))
+        elif type_ == "opt":
+            optimizer.load_state_dict(
+                torch.load(paths.model_dir + f"-new/split-{self.split}-epoch-" + str(max_ind) + f".{type_}"))
+
     def train(self, save_dir, batch_gen_train, batch_gen_val, train_df, num_epochs, batch_size,
               learning_rate, split,
               device):
         data = []
-        # feature model
         optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
+        if self.pretrained:
+            self.load_previous_model("opt", optimizer=optimizer)
 
-        # # kinetic model
-        # kin_optimizer = optim.Adam(self.kin_model.parameters(), lr=learning_rate)
-
-        for epoch in range(num_epochs):
-            # feature model
+        for epoch in range(self.latest_epoch, self.latest_epoch + num_epochs):
             self.model.train()
             self.model.to(device)
             epoch_loss = 0
             correct = 0
             total = 0
 
-            # # kinetic model
-            # self.kin_model.train()
-            # self.kin_model.to(device)
-            # kin_epoch_loss = 0
-            # kin_correct = 0
-            # kin_total = 0
-
             print(f"Train epoch number: {epoch + 1}")
             for _ in tqdm(range(len(batch_gen_train.list_of_examples))):
-                # feature model
                 batch_input, batch_target, mask, batch_kin = batch_gen_train.next_batch(batch_size)
                 batch_input, batch_target, mask, batch_kin = batch_input.to(device), batch_target.to(device), mask.to(
                     device), batch_kin.to(device)
                 optimizer.zero_grad()
                 predictions = self.model(batch_input, batch_kin)
-
-                # # kinetic model
-                # kin_batch_input, kin_batch_target, kin_mask = kin_batch_gen_train.next_batch(batch_size)
-                # kin_batch_input, kin_batch_target, kin_mask = kin_batch_input.to(device), kin_batch_target.to(
-                #     device), kin_mask.to(device)
-                # # kin_optimizer.zero_grad()
-                # kin_predictions = self.kin_model(kin_batch_input)
-
-                #### incorporate predictions ####
-                # lam = utils.kin_lambda
-                # cutoff = min(predictions.shape[-1], kin_predictions.shape[-1])
-                # predictions = predictions[:, :, :, :cutoff]
-                # kin_predictions = kin_predictions[:, :, :, :cutoff]
-                # comb_pred = predictions * (1 - lam) + kin_predictions * lam
 
                 loss = 0
                 for p in predictions:
@@ -221,17 +214,11 @@ class Trainer:
                 correct += ((predicted == batch_target).float() * mask[:, 0, :].squeeze(1)).sum().item()
                 total += torch.sum(mask[:, 0, :]).item()
 
-            # feature model
             batch_gen_train.reset()
             torch.save(self.model.state_dict(),
                        save_dir + f"/split-{split}-epoch-" + str(epoch + 1) + ".model")
             torch.save(optimizer.state_dict(),
                        save_dir + f"/split-{split}-epoch-" + str(epoch + 1) + ".opt")
-
-            # # kinetic model
-            # kin_batch_gen_train.reset()
-            # torch.save(self.kin_model.state_dict(), save_dir + f"/kinetic_model/split-{split}-epoch-" + str(epoch + 1) + ".model")
-            # # torch.save(kin_optimizer.state_dict(), save_dir + f"/kinetic_model/split-{split}-epoch-" + str(epoch + 1) + ".opt")
 
             logger.info("[epoch %d]: epoch train loss = %f,   train acc = %f" %
                         (epoch + 1, epoch_loss / len(batch_gen_train.list_of_examples), float(correct) / total))
@@ -239,11 +226,12 @@ class Trainer:
             train_loss = epoch_loss / len(batch_gen_train.list_of_examples)
             train_acc = float(correct) / total
 
-            # # clearml block
-            # Logger.current_logger().report_scalar(title="train_loss", series="loss", iteration=(epoch + 1),
-            #                                       value=train_loss)
-            # Logger.current_logger().report_scalar(title="train_acc", series="accuracy", iteration=(epoch + 1),
-            #                                       value=train_acc)
+            # clearml block
+            if utils.clearml_flag:
+                Logger.current_logger().report_scalar(title="train_loss", series="loss", iteration=(epoch + 1),
+                                                      value=train_loss)
+                Logger.current_logger().report_scalar(title="train_acc", series="accuracy", iteration=(epoch + 1),
+                                                      value=train_acc)
 
             data.append(
                 {"Split": split, "Type": "Train", "Epoch": epoch + 1, "Loss": train_loss, "Accuracy": train_acc})
@@ -259,7 +247,8 @@ class Trainer:
                 total = 0
                 for _ in tqdm(range(len(batch_gen_val.list_of_examples))):
                     batch_input, batch_target, mask, batch_kin = batch_gen_val.next_batch(batch_size)
-                    batch_input, batch_target, mask, batch_kin = batch_input.to(device), batch_target.to(device), mask.to(device), batch_kin.to(device)
+                    batch_input, batch_target, mask, batch_kin = batch_input.to(device), batch_target.to(
+                        device), mask.to(device), batch_kin.to(device)
                     # optimizer.zero_grad()
                     predictions = self.model(batch_input, batch_kin)
 
@@ -289,11 +278,12 @@ class Trainer:
                 valid_loss = epoch_loss / len(batch_gen_val.list_of_examples)
                 valid_acc = float(correct) / total
 
-                # # clearml block
-                # Logger.current_logger().report_scalar(title="valid_loss", series="loss", iteration=(epoch + 1),
-                #                                       value=valid_loss)
-                # Logger.current_logger().report_scalar(title="valid_acc", series="accuracy", iteration=(epoch + 1),
-                #                                       value=valid_acc)
+                # clearml block
+                if utils.clearml_flag:
+                    Logger.current_logger().report_scalar(title="valid_loss", series="loss", iteration=(epoch + 1),
+                                                          value=valid_loss)
+                    Logger.current_logger().report_scalar(title="valid_acc", series="accuracy", iteration=(epoch + 1),
+                                                          value=valid_acc)
 
                 data.append({"Split": split, "Type": "Validation", "Epoch": epoch + 1, "Loss": valid_loss,
                              "Accuracy": valid_acc})

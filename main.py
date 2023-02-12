@@ -13,10 +13,11 @@ import utils
 import pandas as pd
 from clearml import Task
 
-# # clearml block
-# task = Task.init(project_name='CVOR_PROJ', task_name='TEST-TRAIN')
-# # TODO: check if can be changed (Ilanit)
-# task.set_user_properties({"name": "backbone", "description": "network type", "value": "mstcn++"})
+# clearml block
+if utils.clearml_flag:
+    task = Task.init(project_name='CVOR_PROJ', task_name='TEST-TRAIN')
+    # TODO: check if can be changed (Ilanit)
+    task.set_user_properties({"name": "backbone", "description": "network type", "value": "mstcn++"})
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 seed = 1538574472
@@ -26,7 +27,7 @@ torch.cuda.manual_seed_all(seed)
 torch.backends.cudnn.deterministic = True
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--action', default='train')
+parser.add_argument('--action', default='predict')
 parser.add_argument('--dataset', default="gtea")
 parser.add_argument('--split', default='1')
 
@@ -125,7 +126,8 @@ if args.action == "train":
                 "Epoch"]
         chosen.write(f"{i}: {best_epoch}\n")
         # trainer.predict(model_dir, results_dir, *test_feature_paths, *test_files, best_epoch, actions_dict, device, sample_rate, i)
-        print('\033[1m' + f"\n\n### best model for split {i} was chosen from epoch number {best_epoch}\{num_epochs} ###\n\n" + '\033[0m')
+        print(
+            '\033[1m' + f"\n\n### best model for split {i} was chosen from epoch number {best_epoch}\{num_epochs} ###\n\n" + '\033[0m')
 
     train_df.to_csv("final_training_results.csv", index=False)
 

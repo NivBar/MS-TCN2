@@ -98,6 +98,7 @@ def f_score(recognized, ground_truth, overlap, bg_class=["background"]):
 
 
 def main():
+    name = "new"
     actions_dict = utils.create_actions_dict()
     # parser = argparse.ArgumentParser()
     #
@@ -107,8 +108,8 @@ def main():
     # args = parser.parse_args()
 
     ground_truth_path = paths.gt_path
-    recog_path = paths.results_dir
-    file_list = paths.vid_list_file_tst
+    recog_path = paths.results_dir + f"-{name}"
+    # file_list = paths.vid_list_file_tst
 
     # list_of_videos = read_file(file_list).split('\n')[:-1]
     list_of_videos = []

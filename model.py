@@ -12,6 +12,8 @@ from clearml import Logger
 from tqdm import tqdm
 import pandas as pd
 
+import utils
+
 
 class MS_TCN2(nn.Module):
     def __init__(self, num_layers_PG, num_layers_R, num_R, num_f_maps, dim, num_classes):
@@ -187,11 +189,12 @@ class Trainer:
             train_loss = epoch_loss / len(batch_gen_train.list_of_examples)
             train_acc = float(correct) / total
 
-            # # clearml block
-            # Logger.current_logger().report_scalar(title="train_loss", series="loss", iteration=(epoch + 1),
-            #                                       value=train_loss)
-            # Logger.current_logger().report_scalar(title="train_acc", series="accuracy", iteration=(epoch + 1),
-            #                                       value=train_acc)
+            # clearml block
+            if utils.clearml_flag:
+                Logger.current_logger().report_scalar(title="train_loss", series="loss", iteration=(epoch + 1),
+                                                      value=train_loss)
+                Logger.current_logger().report_scalar(title="train_acc", series="accuracy", iteration=(epoch + 1),
+                                                      value=train_acc)
 
             data.append(
                 {"Split": split, "Type": "Train", "Epoch": epoch + 1, "Loss": train_loss, "Accuracy": train_acc})
@@ -237,18 +240,20 @@ class Trainer:
                 valid_loss = epoch_loss / len(batch_gen_val.list_of_examples)
                 valid_acc = float(correct) / total
 
-                # # clearml block
-                # Logger.current_logger().report_scalar(title="valid_loss", series="loss", iteration=(epoch + 1),
-                #                                       value=valid_loss)
-                # Logger.current_logger().report_scalar(title="valid_acc", series="accuracy", iteration=(epoch + 1),
-                #                                       value=valid_acc)
+                # clearml block
+                if utils.clearml_flag:
+                    Logger.current_logger().report_scalar(title="valid_loss", series="loss", iteration=(epoch + 1),
+                                                          value=valid_loss)
+                    Logger.current_logger().report_scalar(title="valid_acc", series="accuracy", iteration=(epoch + 1),
+                                                          value=valid_acc)
 
                 data.append({"Split": split, "Type": "Validation", "Epoch": epoch + 1, "Loss": valid_loss,
                              "Accuracy": valid_acc})
         df = pd.DataFrame(data)
         return pd.concat([train_df, df])
 
-    def predict(self, model_dir, results_dir, features_path, vid_list_file, epoch, actions_dict, device, sample_rate, split):
+    def predict(self, model_dir, results_dir, features_path, vid_list_file, epoch, actions_dict, device, sample_rate,
+                split):
         print(f"##### prediction - model: split-{split}-epoch-{epoch} #####")
         self.model.eval()
         with torch.no_grad():

@@ -14,9 +14,10 @@ import pandas as pd
 from clearml import Task
 
 # # clearml block
-# task = Task.init(project_name='CVOR_PROJ', task_name='TEST-TRAIN')
-# # TODO: check if can be changed (Ilanit)
-# task.set_user_properties({"name": "backbone", "description": "network type", "value": "mstcn++"})
+if utils.clearml_flag:
+    task = Task.init(project_name='CVOR_PROJ', task_name='TEST-TRAIN')
+    # TODO: check if can be changed (Ilanit)
+    task.set_user_properties({"name": "backbone", "description": "network type", "value": "mstcn++"})
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 seed = 1538574472
@@ -26,12 +27,12 @@ torch.cuda.manual_seed_all(seed)
 torch.backends.cudnn.deterministic = True
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--action', default='predict')
+parser.add_argument('--action', default='train')
 parser.add_argument('--dataset', default="gtea")
 parser.add_argument('--split', default='1')
 
 parser.add_argument('--features_dim', default='1280', type=int)
-parser.add_argument('--kin_features_dim', default='36', type=int)
+parser.add_argument('--kin_features_dim', default=utils.kin_features_dim, type=int)
 parser.add_argument('--bz', default='1', type=int)
 parser.add_argument('--lr', default='0.0005', type=float)
 
@@ -104,7 +105,7 @@ if args.action == "train":
     chosen = open("chosen_epochs.txt", "a+")
     for i in range(utils.start_idx, utils.available_folds):
         trainer = Trainer(num_layers_PG=num_layers_PG, num_layers_R=num_layers_R, num_R=num_R, num_f_maps=num_f_maps,
-                          features_dim=features_dim, num_classes=num_classes, dataset=f"fold{i}", split=f"fold{i}")
+                          features_dim=features_dim, num_classes=num_classes, dataset=f"fold{i}", split=f"{i}", pretrained=True)
         train_files = [tf for tf in vid_list_file_folds if vid_list_file_folds.index(tf) != i]
         val_files = [tf for tf in vid_list_file_folds if vid_list_file_folds.index(tf) == i]
         train_feature_paths = [tf for tf in features_path_folds if features_path_folds.index(tf) != i]
@@ -124,7 +125,8 @@ if args.action == "train":
         #                                    kinematics=True)
         # kin_batch_gen_val.read_data(val_files)
 
-        train_df = trainer.train(save_dir=model_dir, batch_gen_train=batch_gen_train, batch_gen_val=batch_gen_val, train_df=train_df,
+        train_df = trainer.train(save_dir=model_dir, batch_gen_train=batch_gen_train, batch_gen_val=batch_gen_val,
+                                 train_df=train_df,
                                  num_epochs=num_epochs, batch_size=bz, learning_rate=lr, split=i, device=device)
         train_df.to_csv("temp_training_results.csv", index=False)
 
@@ -140,7 +142,8 @@ if args.action == "train":
         print(
             '\033[1m' + f"\n\n### best model for split {i} was chosen from epoch number {best_epoch}\{num_epochs} ###\n\n" + '\033[0m')
 
-    train_df.to_csv("final_training_results.csv", index=False)
+    epochs = sorted(set([str(x) for x in train_df["Epoch"]]))
+    train_df.to_csv(f"final_training_results_epochs_{'_'.join(epochs)}.csv", index=False)
 
 if args.action == "predict":
     model_dict = utils.model_dict
@@ -149,5 +152,7 @@ if args.action == "predict":
         test_feature_paths = features_path_folds[i]
         test_kin_path = paths.kinematics_path
 
-        trainer = Trainer(num_layers_PG, num_layers_R, num_R, num_f_maps, features_dim, num_classes, f"fold{i}", f"fold{i}")
-        trainer.predict(model_dir, results_dir, test_feature_paths, test_files, model_dict[i], actions_dict, device, sample_rate, split=i)
+        trainer = Trainer(num_layers_PG, num_layers_R, num_R, num_f_maps, features_dim, num_classes, f"fold{i}",
+                          f"fold{i}")
+        trainer.predict(model_dir, results_dir, test_feature_paths, test_files, model_dict[i], actions_dict, device,
+                        sample_rate, split=i)

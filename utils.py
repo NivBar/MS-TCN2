@@ -6,19 +6,20 @@ import numpy as np
 import paths
 import torch
 
-if torch.cuda.is_available(): # on machine with GPU
+if torch.cuda.is_available():  # on machine with GPU
     available_folds = 5
     num_epochs = 5
     model_dict = {0: 4, 1: 3, 2: 4, 3: 5, 4: 5}
-else: # local debugging
+else:  # local debugging
     available_folds = 2
     num_epochs = 3
     model_dict = {0: 3, 1: 3}
 
 start_idx = 0  # in case we want to skip training on some indexes
-kin_lambda = (36/1280)*2
+kin_lambda = 0.2  # (36/1280)*2
 len_df = pd.read_csv("length_table.csv").set_index("vid_name")
 kin_features_dim = 36
+clearml_flag = False
 
 
 def get_folds_paths():
