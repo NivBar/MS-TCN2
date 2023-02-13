@@ -6,18 +6,25 @@ import utils
 import paths
 from eval import read_file
 
-tasks = {"acc_loss": False, "conf_mat": True}
-chosen = {0: 4, 1: 4, 2: 4, 3: 5, 4: 4}
+
+
+
+
+
+tasks = {"acc_loss": True, "conf_mat": False}
 colors = {0: "orange", 1: "gold", 2: "green", 3: "blue", 4: "purple"}
 lable_dict = {0: "G0", 1: "G1", 2: "G2", 3: "G3", 4: "G4", 5: "G5"}
-df = pd.read_csv("final_training_results.csv")
+df = pd.read_csv("new_final_training_results_15_complete.csv")
+epochs = len(set(df.Epoch))
+chosen = utils.model_dict
+x=1
 
 if tasks["acc_loss"]:
     for measure in ["Accuracy", "Loss"]:
         for type_ in ["Train", "Validation"]:
             type_df = df[df.Type == type_]
             for i in range(5):
-                plt.plot(range(1, 6), type_df[type_df.Split == i][measure], label=f"fold {i}", color=colors[i])
+                plt.plot(range(1, epochs+1), type_df[type_df.Split == i][measure], label=f"fold {i}", color=colors[i])
                 plt.plot(chosen[i], list(type_df[type_df.Split == i][measure])[chosen[i] - 1],
                          marker="o", markeredgecolor=colors[i], markerfacecolor="red")
             plt.legend()
@@ -25,8 +32,8 @@ if tasks["acc_loss"]:
             plt.xlabel('Epoch')
             plt.ylabel(measure)
             plt.title(f"{type_} {measure} by fold")
-            plt.xticks(np.arange(1, 6, 1.0))
-            plt.savefig(f"./graphs/new_{type_}_{measure}.jpg")
+            plt.xticks(np.arange(1, epochs, 1.0))
+            plt.savefig(f"./graphs/new_{epochs}_{type_}_{measure}.jpg")
             plt.show()
 
 if tasks["conf_mat"]:

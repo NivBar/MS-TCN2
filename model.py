@@ -11,7 +11,8 @@ from loguru import logger
 from clearml import Logger
 from tqdm import tqdm
 import pandas as pd
-
+from os import listdir
+import paths
 import utils
 
 
@@ -90,24 +91,6 @@ class Refinement(nn.Module):
         return out
 
 
-# TODO: not used maybe delete?
-
-# class MS_TCN(nn.Module):
-#     def __init__(self, num_stages, num_layers, num_f_maps, dim, num_classes):
-#         super(MS_TCN, self).__init__()
-#         self.stage1 = SS_TCN(num_layers, num_f_maps, dim, num_classes)
-#         self.stages = nn.ModuleList([copy.deepcopy(SS_TCN(num_layers, num_f_maps, num_classes, num_classes)) for s in
-#         range(num_stages-1)])
-#
-#     def forward(self, x, mask):
-#         out = self.stage1(x, mask)
-#         outputs = out.unsqueeze(0)
-#         for s in self.stages:
-#             out = s(F.softmax(out, dim=1) * mask[:, 0:1, :], mask)
-#             outputs = torch.cat((outputs, out.unsqueeze(0)), dim=0)
-#         return outputs
-
-
 class SS_TCN(nn.Module):
     def __init__(self, num_layers, num_f_maps, dim, num_classes):
         super(SS_TCN, self).__init__()
@@ -139,8 +122,16 @@ class DilatedResidualLayer(nn.Module):
 
 
 class Trainer:
-    def __init__(self, num_layers_PG, num_layers_R, num_R, num_f_maps, dim, num_classes, dataset, split):
-        self.model = MS_TCN2(num_layers_PG, num_layers_R, num_R, num_f_maps, dim, num_classes)
+    def __init__(self, num_layers_PG, num_layers_R, num_R, num_f_maps, features_dim, num_classes, dataset, split,
+                 pretrained=False):
+        print(
+            f"\n\n##### running new model #####\nsplit-{split}\nplanned epochs per model - {utils.num_epochs}\navailable folds - {utils.available_folds}\n\n")
+        self.model = MS_TCN2(num_layers_PG, num_layers_R, num_R, num_f_maps, features_dim, num_classes)
+        self.pretrained = pretrained
+        self.split = split
+        self.latest_epoch = 0
+        if self.pretrained:
+            self.load_previous_model("model")
         self.ce = nn.CrossEntropyLoss(ignore_index=-100)
         self.mse = nn.MSELoss(reduction='none')
         self.num_classes = num_classes
@@ -148,11 +139,34 @@ class Trainer:
         logger.add('logs/' + dataset + "_" + split + "_{time}.log")
         logger.add(sys.stdout, colorize=True, format="{message}")
 
+    def load_previous_model(self, type_, optimizer=None):
+        # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        map_location = "cuda:0" if torch.cuda.is_available() else 'cpu'
+        model_list = [m for m in listdir(paths.model_dir + "-new") if (type_ in m) & (self.split in m)]
+        max_ind = max([int(model.split(".")[0].split("-")[-1]) for model in model_list])
+        self.latest_epoch = max_ind
+        if type_ == "model":
+            self.model.load_state_dict(
+                torch.load(paths.model_dir + f"-new/split-{self.split}-epoch-" + str(max_ind) + f".{type_}",
+                           map_location=map_location))
+        elif type_ == "opt":
+            optimizer.load_state_dict(
+                torch.load(paths.model_dir + f"-new/split-{self.split}-epoch-" + str(max_ind) + f".{type_}",
+                           map_location=map_location))
+            if map_location == "cuda:0":
+                for state in optimizer.state.values():
+                    for k, v in state.items():
+                        if torch.is_tensor(v):
+                            state[k] = v.cuda()
+
     def train(self, save_dir, batch_gen_train, batch_gen_val, train_df, num_epochs, batch_size, learning_rate, split,
               device):
         data = []
         optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
-        for epoch in range(num_epochs):
+        if self.pretrained:
+            self.load_previous_model("opt", optimizer=optimizer)
+
+        for epoch in range(self.latest_epoch, self.latest_epoch + num_epochs):
             self.model.train()
             self.model.to(device)
             epoch_loss = 0

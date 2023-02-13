@@ -7,9 +7,10 @@ import utils
 import paths
 from clearml import Logger, Task
 
-# task = Task.init(project_name='CVOR_PROJ', task_name='TEST-EVAL')
-# # TODO: check if can be changed (Ilanit)
-# task.set_user_properties({"name": "backbone", "description": "network type", "value": "mstcn++"})
+if utils.clearml_flag:
+    task = Task.init(project_name='CVOR_PROJ', task_name='TEST-EVAL')
+    # TODO: check if can be changed (Ilanit)
+    task.set_user_properties({"name": "backbone", "description": "network type", "value": "mstcn++"})
 
 
 def read_file(path):
@@ -100,18 +101,9 @@ def f_score(recognized, ground_truth, overlap, bg_class=["background"]):
 def main():
     name = "new"
     actions_dict = utils.create_actions_dict()
-    # parser = argparse.ArgumentParser()
-    #
-    # parser.add_argument('--dataset', default="gtea")
-    # parser.add_argument('--split', default='1')
-    #
-    # args = parser.parse_args()
-
     ground_truth_path = paths.gt_path
     recog_path = paths.results_dir + f"-{name}"
-    # file_list = paths.vid_list_file_tst
 
-    # list_of_videos = read_file(file_list).split('\n')[:-1]
     list_of_videos = []
     _, vid_list_file_tst_folds, _ = utils.get_folds_paths()
     for file_list in vid_list_file_tst_folds:
@@ -144,14 +136,14 @@ def main():
             fp[s] += fp1
             fn[s] += fn1
 
-
     acc = (100 * float(correct) / total)
     edit = ((1.0 * edit) / len(list_of_videos))
     print("Acc: %.4f" % (acc))
     print('Edit: %.4f' % (edit))
 
-    # # clearml block
-    # Logger.current_logger().report_text(f"Test Results:\nTest Acc: {acc}\nTest Edit: {edit}")
+    if utils.clearml_flag:
+        # clearml block
+        Logger.current_logger().report_text(f"Test Results:\nTest Acc: {acc}\nTest Edit: {edit}")
 
     for s in range(len(overlap)):
         precision = tp[s] / float(tp[s] + fp[s])
@@ -161,9 +153,9 @@ def main():
 
         f1 = np.nan_to_num(f1) * 100
         print('F1@%0.2f: %.4f' % (overlap[s], f1))
-
-        # # clearml block
-        # Logger.current_logger().report_text(f"F1@{overlap[s]}: {f1}")
+        if utils.clearml_flag:
+            # clearml block
+            Logger.current_logger().report_text(f"F1@{overlap[s]}: {f1}")
 
 
 if __name__ == '__main__':
