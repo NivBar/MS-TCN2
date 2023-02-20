@@ -1,5 +1,5 @@
 #!/usr/bin/python2.7
-
+import os
 import sys
 import torch
 import torch.nn as nn
@@ -124,13 +124,12 @@ class DilatedResidualLayer(nn.Module):
 class Trainer:
     def __init__(self, num_layers_PG, num_layers_R, num_R, num_f_maps, features_dim, num_classes, dataset, split,
                  pretrained=False):
-        print(
-            f"\n\n##### running new model #####\nsplit-{split}\nplanned epochs per model - {utils.num_epochs}\navailable folds - {utils.available_folds}\n\n")
+
         self.model = MS_TCN2(num_layers_PG, num_layers_R, num_R, num_f_maps, features_dim, num_classes)
         self.pretrained = pretrained
         self.split = split
         self.latest_epoch = 0
-        if self.pretrained:
+        if self.pretrained and len(os.listdir(paths.model_dir)) != 0:
             self.load_previous_model("model")
         self.ce = nn.CrossEntropyLoss(ignore_index=-100)
         self.mse = nn.MSELoss(reduction='none')
@@ -142,16 +141,16 @@ class Trainer:
     def load_previous_model(self, type_, optimizer=None):
         # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         map_location = "cuda:0" if torch.cuda.is_available() else 'cpu'
-        model_list = [m for m in listdir(paths.model_dir + "-new") if (type_ in m) & (self.split in m)]
+        model_list = [m for m in listdir(paths.model_dir) if (type_ in m) & (self.split in m)]
         max_ind = max([int(model.split(".")[0].split("-")[-1]) for model in model_list])
         self.latest_epoch = max_ind
         if type_ == "model":
             self.model.load_state_dict(
-                torch.load(paths.model_dir + f"-new/split-{self.split}-epoch-" + str(max_ind) + f".{type_}",
+                torch.load(paths.model_dir + f"/split-{self.split}-epoch-" + str(max_ind) + f".{type_}",
                            map_location=map_location))
         elif type_ == "opt":
             optimizer.load_state_dict(
-                torch.load(paths.model_dir + f"-new/split-{self.split}-epoch-" + str(max_ind) + f".{type_}",
+                torch.load(paths.model_dir + f"/split-{self.split}-epoch-" + str(max_ind) + f".{type_}",
                            map_location=map_location))
             if map_location == "cuda:0":
                 for state in optimizer.state.values():
@@ -161,9 +160,11 @@ class Trainer:
 
     def train(self, save_dir, batch_gen_train, batch_gen_val, train_df, num_epochs, batch_size, learning_rate, split,
               device):
+        print(
+            f"\n\n##### running new model #####\nsplit-{split}\nplanned epochs per model - {utils.num_epochs}\navailable folds - {utils.available_folds}\n\n")
         data = []
         optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
-        if self.pretrained:
+        if self.pretrained and len(os.listdir(paths.model_dir)) != 0:
             self.load_previous_model("opt", optimizer=optimizer)
 
         for epoch in range(self.latest_epoch, self.latest_epoch + num_epochs):

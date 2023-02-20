@@ -98,11 +98,10 @@ def f_score(recognized, ground_truth, overlap, bg_class=["background"]):
     return float(tp), float(fp), float(fn)
 
 
-def main():
-    name = "new"
+def main(ret_dict=False, name = "new"):
     actions_dict = utils.create_actions_dict()
     ground_truth_path = paths.gt_path
-    recog_path = paths.results_dir + f"-{name}"
+    recog_path = paths.results_dir #+ f"-{name}"
 
     list_of_videos = []
     _, vid_list_file_tst_folds, _ = utils.get_folds_paths()
@@ -145,6 +144,7 @@ def main():
         # clearml block
         Logger.current_logger().report_text(f"Test Results:\nTest Acc: {acc}\nTest Edit: {edit}")
 
+    res_dict = dict()
     for s in range(len(overlap)):
         precision = tp[s] / float(tp[s] + fp[s])
         recall = tp[s] / float(tp[s] + fn[s])
@@ -153,9 +153,14 @@ def main():
 
         f1 = np.nan_to_num(f1) * 100
         print('F1@%0.2f: %.4f' % (overlap[s], f1))
+
+        res_dict[f"f1@{overlap[s]}"] = f1
         if utils.clearml_flag:
             # clearml block
             Logger.current_logger().report_text(f"F1@{overlap[s]}: {f1}")
+    if ret_dict:
+        res_dict["acc"], res_dict["edit"] = acc, edit
+        return res_dict
 
 
 if __name__ == '__main__':

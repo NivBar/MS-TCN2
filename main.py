@@ -50,7 +50,7 @@ num_R = args.num_R
 num_f_maps = args.num_f_maps
 sample_rate = 1
 
-
+# utils.create_new_data_division()
 vid_list_file_folds, vid_list_file_tst_folds, features_path_folds = utils.get_folds_paths()
 gt_path = paths.gt_path
 mapping_file = paths.mapping_file
@@ -78,10 +78,12 @@ if args.action == "train":
         trainer = Trainer(num_layers_PG=num_layers_PG, num_layers_R=num_layers_R, num_R=num_R, num_f_maps=num_f_maps,
                           features_dim=features_dim, num_classes=num_classes, dataset=f"fold{i}", split=f"{i}",
                           pretrained=True)
-        train_files = [tf for tf in vid_list_file_folds if vid_list_file_folds.index(tf) != i]
-        val_files = [tf for tf in vid_list_file_folds if vid_list_file_folds.index(tf) == i]
+
         train_feature_paths = [tf for tf in features_path_folds if features_path_folds.index(tf) != i]
-        valid_feature_paths = [tf for tf in features_path_folds if features_path_folds.index(tf) == i]
+        valid_feature_paths = features_path_folds[i + 1 if i != utils.available_folds - 1 else 0]
+
+        train_files = [fr"./new_data_division/train_{i}.txt"]
+        val_files = [fr"./new_data_division/valid_{i}.txt"]
 
         batch_gen_train = BatchGenerator(num_classes, actions_dict, gt_path, train_feature_paths, sample_rate)
         batch_gen_train.read_data(train_files)
@@ -110,4 +112,4 @@ if args.action == "predict":
 
         trainer = Trainer(num_layers_PG, num_layers_R, num_R, num_f_maps, features_dim, num_classes, f"fold{i}", f"fold{i}")
         trainer.predict(model_dir, results_dir, test_feature_paths, test_files, model_dict[i], actions_dict, device, sample_rate, split=i)
-        eval.main()
+    eval.main()
