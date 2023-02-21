@@ -76,14 +76,13 @@ num_classes = len(actions_dict)
 
 if args.action == "train":
     train_df = pd.DataFrame()
-    chosen = open("chosen_epochs_new.txt", "a+")
+    chosen = open(fr"chosen_epochs_new.txt", "a+")
     for i in range(utils.start_idx, utils.available_folds):
         trainer = Trainer(num_layers_PG=num_layers_PG, num_layers_R=num_layers_R, num_R=num_R, num_f_maps=num_f_maps,
                           features_dim=features_dim, num_classes=num_classes, dataset=f"fold{i}", split=f"{i}",
                           pretrained=True)
 
-        train_feature_paths = [tf for tf in features_path_folds if features_path_folds.index(tf) != i]
-        valid_feature_paths = features_path_folds[i + 1 if i != utils.available_folds - 1 else 0]
+        train_feature_paths = valid_feature_paths = [features_path_folds[i]]
 
         train_files = [fr"./new_data_division/train_{i}.txt"]
         val_files = [fr"./new_data_division/valid_{i}.txt"]

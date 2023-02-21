@@ -2,7 +2,6 @@
 This file will include utility functions we add in order to fit our surgical data and task
 """
 import os
-
 import pandas as pd
 import numpy as np
 import paths
@@ -72,7 +71,7 @@ if torch.cuda.is_available():  # on machine with GPU
     available_folds = 5
     num_epochs = 5
 else:  # local debugging
-    available_folds = 3
+    available_folds = 2
     num_epochs = 3
 
 model_dict = chosen_epochs()
