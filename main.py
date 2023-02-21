@@ -79,8 +79,7 @@ if args.action == "train":
                           features_dim=features_dim, num_classes=num_classes, dataset=f"fold{i}", split=f"{i}",
                           pretrained=True)
 
-        train_feature_paths = [tf for tf in features_path_folds if features_path_folds.index(tf) != i]
-        valid_feature_paths = features_path_folds[i + 1 if i != utils.available_folds - 1 else 0]
+        train_feature_paths = valid_feature_paths = [features_path_folds[i]]
 
         train_files = [fr"./new_data_division/train_{i}.txt"]
         val_files = [fr"./new_data_division/valid_{i}.txt"]

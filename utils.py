@@ -48,7 +48,7 @@ def create_new_data_division():
             file.close()
 
 
-def chosen_epochs(path=fr"new_final_training_results_15_complete.csv", write_=False, max_epoch=0):
+def chosen_epochs(path=fr"new_split_new_model_temp_training_results_20_splits_all.csv", write_=False, max_epoch=0):
     df = pd.read_csv(path)
     if max_epoch > 0:
         df = df[df.Epoch <= max_epoch]

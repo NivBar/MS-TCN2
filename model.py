@@ -129,7 +129,7 @@ class Trainer:
         self.pretrained = pretrained
         self.split = split
         self.latest_epoch = 0
-        if self.pretrained and len(os.listdir(paths.model_dir)) != 0:
+        if self.pretrained and (fr"split-{split}-epoch-1" in os.listdir(paths.model_dir)):
             self.load_previous_model("model")
         self.ce = nn.CrossEntropyLoss(ignore_index=-100)
         self.mse = nn.MSELoss(reduction='none')
@@ -164,7 +164,7 @@ class Trainer:
             f"\n\n##### running new model #####\nsplit-{split}\nplanned epochs per model - {utils.num_epochs}\navailable folds - {utils.available_folds}\n\n")
         data = []
         optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
-        if self.pretrained and len(os.listdir(paths.model_dir)) != 0:
+        if self.pretrained and (fr"split-{split}-epoch-1" in os.listdir(paths.model_dir)):
             self.load_previous_model("opt", optimizer=optimizer)
 
         for epoch in range(self.latest_epoch, self.latest_epoch + num_epochs):
