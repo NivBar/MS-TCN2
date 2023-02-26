@@ -6,7 +6,7 @@ import utils
 import paths
 from eval import read_file
 
-file_path = fr"new_split_new_model_temp_training_results_20_splits_all.csv"
+file_path = fr"new_split_old_model_temp_training_results_20_splits_all.csv"
 
 tasks = {"acc_loss": False, "conf_mat": True}
 colors = {0: "orange", 1: "gold", 2: "green", 3: "blue", 4: "purple"}
@@ -34,7 +34,7 @@ if tasks["acc_loss"]:
             plt.ylabel(measure)
             plt.title(f"{type_} {measure} by fold")
             plt.xticks(np.arange(1, epochs, 1.0))
-            plt.savefig(f"./graphs/new_{epochs}_{type_}_{measure}.jpg")
+            plt.savefig(f"./graphs/old_{epochs}_{type_}_{measure}.jpg")
             plt.show()
 
 if tasks["conf_mat"]:
@@ -54,5 +54,5 @@ if tasks["conf_mat"]:
     cm = confusion_matrix(gt_content[:cutoff], recog_content[:cutoff])
     disp = ConfusionMatrixDisplay(confusion_matrix=cm)
     disp.plot()
-    plt.savefig(f"./graphs/new_conf_matrix.jpg")
+    plt.savefig(f"./graphs/old_conf_matrix.jpg")
     plt.show()
